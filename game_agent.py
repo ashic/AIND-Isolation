@@ -226,7 +226,7 @@ class MinimaxPlayer(IsolationPlayer):
 
         return self.max_value(game, depth)[1]
 
-    def min_value(self, game, depth):
+    def min_value(self, game, depth, alpha=None, beta=None):
 
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
@@ -237,19 +237,29 @@ class MinimaxPlayer(IsolationPlayer):
         opponent = game.get_opponent(self)
         moves = game.get_legal_moves(opponent)
 
-        results = \
-            [(
-                self.max_value(
-                    game.forecast_move(m),
-                    depth - 1)[0],
-                m
-            ) for m in moves]
+        best_score = float("inf")
+        best_move = (-1, -1)
 
-        with_default = [(float("inf"), (-1, -1))] + results
+        for m in moves:
+            next_score, _ = self.max_value(
+                game.forecast_move(m),
+                depth - 1,
+                alpha, beta
+            )
 
-        return min(with_default, key=lambda x: x[0])
+            if best_score > next_score:
+                best_score = next_score
+                best_move = m
 
-    def max_value(self, game, depth):
+                if alpha is not None:
+                    if best_score <= alpha:
+                        return best_score, m
+                    else:
+                        beta = min(beta, best_score)
+
+        return best_score, best_move
+
+    def max_value(self, game, depth, alpha=None, beta=None):
 
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
@@ -259,20 +269,30 @@ class MinimaxPlayer(IsolationPlayer):
 
         moves = game.get_legal_moves(self)
 
-        results = \
-            [(
-                self.min_value(
-                    game.forecast_move(m),
-                    depth - 1)[0],
-                m
-            ) for m in moves]
+        best_score = float("-inf")
+        best_move = (-1, -1)
 
-        with_default = [(float("-inf"), (-1, -1))] + results
+        for m in moves:
+            next_score, _ = self.min_value(
+                game.forecast_move(m),
+                depth - 1,
+                alpha, beta
+            )
 
-        return max(with_default, key=lambda x: x[0])
+            if best_score < next_score:
+                best_score = next_score
+                best_move = m
+
+                if alpha is not None:
+                    if best_score >= beta:
+                        return best_score, best_move
+
+                    alpha = max(alpha, best_score)
+
+        return best_score, best_move
 
 
-class AlphaBetaPlayer(IsolationPlayer):
+class AlphaBetaPlayer(MinimaxPlayer):
     """Game-playing agent that chooses a move using iterative deepening minimax
     search with alpha-beta pruning. You must finish and test this player to
     make sure it returns a good move before the search time limit expires.
@@ -310,8 +330,25 @@ class AlphaBetaPlayer(IsolationPlayer):
         """
         self.time_left = time_left
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # Initialize the best move so that this function returns something
+        # in case the search fails due to timeout
+        best_move = (-1, -1)
+        current_depth = 1
+
+        try:
+            # The try/except block will automatically catch the exception
+            # raised when the timer is about to expire.
+            while True:
+                best_move = self.alphabeta(game, current_depth)
+                current_depth += 1
+                if best_move == (-1, -1):
+                    break
+
+        except SearchTimeout:
+            pass  # Handle any actions required after timeout as needed
+
+        # Return the best move from the last completed search iteration
+        return best_move
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf")):
         """Implement depth-limited minimax search with alpha-beta pruning as
@@ -361,5 +398,4 @@ class AlphaBetaPlayer(IsolationPlayer):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        return self.max_value(game, depth, alpha, beta)[1]
